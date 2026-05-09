@@ -2,15 +2,19 @@
 
 Real-time nutritional status detection dashboard that classifies children as **gizi_buruk** (malnourished) or **normal** using YOLO object detection models.
 
-**Live Demo:** [https://smart-stunting-dashboard.streamlit.app](https://smart-stunting-dashboard.streamlit.app)
+**Live Demo (Dashboard):** [https://smart-stunting-dashboard.streamlit.app](https://smart-stunting-dashboard.streamlit.app)
+
+**Realtime Camera (GitHub Pages):** [https://haerulyudaaditiya.github.io/smart-stunting-dashboard/](https://haerulyudaaditiya.github.io/smart-stunting-dashboard/)
 
 ## Features
 
 - **Multi-Engine Detection** — Switch between YOLOv8, YOLO11, YOLO26, or Ensemble (NMS Voting) mode
 - **Side-by-Side Comparison** — Compare all three model outputs on a single image
-- **Webcam & Image Upload** — Live feed or batch image processing
-- **Batch Processing** — Upload multiple images and export results as Excel (.xlsx)
+- **Realtime Camera (Client-side)** — Runs on GitHub Pages for zero-lag camera access
+- **Image Upload & Batch Processing** — Upload multiple images and export results as Excel (.xlsx)
 - **Adjustable Thresholds** — Fine-tune Confidence and IoU (NMS) parameters via sliders
+
+**Note:** The Streamlit "Webcam" menu is a shortcut that directs users to the GitHub Pages realtime module.
 
 ## Tech Stack
 
@@ -37,6 +41,9 @@ Open [http://localhost:8501](http://localhost:8501) in your browser.
 
 ```
 ├── app.py                # Main Streamlit application
+├── index.html            # GitHub Pages realtime camera module
+├── app.js                # Client-side inference logic (ONNX)
+├── style.css             # GitHub Pages styling
 ├── models/               # YOLO weight files (.pt)
 │   ├── yolov8_best_fold_3.pt
 │   ├── yolov11_best_fold_3.pt

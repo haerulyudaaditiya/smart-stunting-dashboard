@@ -18,8 +18,6 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from PIL import Image
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
-import av
 
 # ---------------------------------------------------------------------------
 # 1. PAGE CONFIG
@@ -540,69 +538,19 @@ def main():
             )
             return
 
-        st.markdown(
-            """
-            <div style="background-color: #d4edda; border-color: #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-                <h3 style="margin-top: 0; color: #155724;">Performa Kamera Maksimal Tersedia!</h3>
-                <p>Untuk deteksi <em>real-time</em> tanpa lag (berjalan 100% di perangkat Anda tanpa delay server), silakan gunakan Modul Kamera Web Khusus kami:</p>
-                <a href="https://haerulyudaaditiya.github.io/smart-stunting-dashboard/" target="_blank" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">👉 Buka Kamera Real-time (Cepat)</a>
-            </div>
-            """,
-            unsafe_allow_html=True
+        st.success(
+            "Performa Kamera Maksimal Tersedia!\n\n"
+            "Untuk deteksi *real-time* tanpa lag, gunakan Modul Kamera Web di GitHub Pages "
+            "(berjalan 100% di perangkat Anda tanpa delay server)."
         )
-        st.info("Atau, Anda dapat menggunakan versi Cloud (WebRTC) di bawah ini dengan kecepatan frame yang lebih rendah.")
-
-        # Build a video processor class that captures the current settings
-        class YOLOVideoProcessor(VideoProcessorBase):
-            """Process each webcam frame through the selected YOLO engine.
-
-            streamlit-webrtc streams frames from the user's browser camera
-            via WebRTC, so this works on both local and cloud deployments.
-            """
-
-            def __init__(self):
-                self.engine = engine
-                self.conf = conf
-                self.iou = iou
-                self.result_info = {"engine": "", "infer_ms": 0.0, "count": 0}
-
-            def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-                img = frame.to_ndarray(format="bgr24")
-
-                # Run detection
-                annotated, infer_ms, count, engine_label, _ = process_frame(
-                    img, models, self.engine, self.conf, self.iou
-                )
-
-                # Store metrics for display
-                self.result_info = {
-                    "engine": engine_label,
-                    "infer_ms": infer_ms,
-                    "count": count,
-                }
-
-                return av.VideoFrame.from_ndarray(annotated, format="bgr24")
-
-        # TURN server config for cloud NAT traversal
-        rtc_config = {
-            "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-        }
-
-        ctx = webrtc_streamer(
-            key="smart-stunting-webcam",
-            video_processor_factory=YOLOVideoProcessor,
-            rtc_configuration=rtc_config,
-            media_stream_constraints={"video": True, "audio": False},
+        st.link_button(
+            "Buka Kamera Real-time (Cepat)",
+            "https://haerulyudaaditiya.github.io/smart-stunting-dashboard/",
         )
-
-        # Display metrics while streaming
-        if ctx.video_processor:
-            info = ctx.video_processor.result_info
-            render_scorecard(
-                info.get("engine", engine),
-                info.get("infer_ms", 0.0),
-                info.get("count", 0),
-            )
+        st.info(
+            "Menu 'Webcam' di Streamlit ini hanya sebagai pengarah. "
+            "Gunakan 'Upload Image' untuk analisis di sini."
+        )
 
 
 # ---------------------------------------------------------------------------
