@@ -17,23 +17,28 @@ let lastTime = 0;
 const classNames = ["gizi_buruk", "normal"];
 const colors = ["#FF4B4B", "#21C354"];
 
-// Configure ONNX Runtime to use WASM backend
-ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/";
+// Configure ONNX Runtime to use WASM backend (Pinned version)
+ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/";
 
 async function initModel(modelPath) {
     if (session) {
         await session.release();
     }
     startBtn.disabled = true;
+    startBtn.innerText = "Memuat Model... (Mohon Tunggu)";
     try {
         console.log(`Loading model: ${modelPath}`);
         // Load the ONNX model using WebAssembly backend
         session = await ort.InferenceSession.create(modelPath, { executionProviders: ['wasm'] });
         console.log(`Model loaded successfully!`);
-        if (!isDetecting) startBtn.disabled = false;
+        if (!isDetecting) {
+            startBtn.disabled = false;
+            startBtn.innerText = "Mulai Kamera";
+        }
     } catch (e) {
         console.error("Failed to load model", e);
-        alert("Gagal memuat model. Pastikan file model ONNX tersedia di direktori yang benar.");
+        startBtn.innerText = "Gagal Memuat Model";
+        alert("Gagal memuat model. Pastikan file model ONNX tersedia dan jaringan internet lancar.");
     }
 }
 
