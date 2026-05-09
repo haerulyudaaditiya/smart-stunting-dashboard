@@ -538,6 +538,16 @@ def main():
             )
             return
 
+        # Detect cloud deployment — webcam requires local execution
+        is_cloud = os.environ.get("STREAMLIT_SHARING_MODE") or os.path.exists("/mount/src")
+        if is_cloud:
+            st.warning(
+                "Webcam mode is not available on Streamlit Cloud. "
+                "The server does not have access to your camera. "
+                "Please run the app locally to use this feature: `streamlit run app.py`"
+            )
+            return
+
         # Initialise session state for webcam control
         if "webcam_running" not in st.session_state:
             st.session_state.webcam_running = False
@@ -567,7 +577,7 @@ def main():
         if not cap.isOpened():
             st.error(
                 "Unable to open webcam (index 0). "
-                "Please check your camera connection."
+                "Please check your camera connection or try a different camera index."
             )
             st.session_state.webcam_running = False
             return
