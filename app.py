@@ -18,6 +18,8 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from PIL import Image
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
+import av
 
 # ---------------------------------------------------------------------------
 # 1. PAGE CONFIG
@@ -538,78 +540,59 @@ def main():
             )
             return
 
-        # Detect cloud deployment — webcam requires local execution
-        is_cloud = os.environ.get("STREAMLIT_SHARING_MODE") or os.path.exists("/mount/src")
-        if is_cloud:
-            st.warning(
-                "Webcam mode is not available on Streamlit Cloud. "
-                "The server does not have access to your camera. "
-                "Please run the app locally to use this feature: `streamlit run app.py`"
-            )
-            return
+        st.info("Allow camera access in your browser when prompted.")
 
-        # Initialise session state for webcam control
-        if "webcam_running" not in st.session_state:
-            st.session_state.webcam_running = False
+        # Build a video processor class that captures the current settings
+        class YOLOVideoProcessor(VideoProcessorBase):
+            """Process each webcam frame through the selected YOLO engine.
 
-        # Start / Stop buttons
-        btn_col1, btn_col2, _ = st.columns([1, 1, 4])
-        with btn_col1:
-            if st.button("Start Webcam", disabled=st.session_state.webcam_running):
-                st.session_state.webcam_running = True
-                st.rerun()
-        with btn_col2:
-            if st.button("Stop Webcam", type="primary",
-                         disabled=not st.session_state.webcam_running):
-                st.session_state.webcam_running = False
-                st.rerun()
+            streamlit-webrtc streams frames from the user's browser camera
+            via WebRTC, so this works on both local and cloud deployments.
+            """
 
-        # Only open the camera when the user has clicked Start
-        if not st.session_state.webcam_running:
-            st.info("Click 'Start Webcam' to begin the live feed.")
-            return
+            def __init__(self):
+                self.engine = engine
+                self.conf = conf
+                self.iou = iou
+                self.result_info = {"engine": "", "infer_ms": 0.0, "count": 0}
 
-        # Placeholders for dynamic frame updates
-        frame_placeholder = st.empty()
-        score_placeholder = st.empty()
+            def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
+                img = frame.to_ndarray(format="bgr24")
 
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
-            st.error(
-                "Unable to open webcam (index 0). "
-                "Please check your camera connection or try a different camera index."
-            )
-            st.session_state.webcam_running = False
-            return
-
-        try:
-            while cap.isOpened() and st.session_state.webcam_running:
-                ret, frame = cap.read()
-                if not ret:
-                    st.warning("Failed to read frame from webcam.")
-                    break
-
-                # Process the frame
+                # Run detection
                 annotated, infer_ms, count, engine_label, _ = process_frame(
-                    frame, models, engine, conf, iou
+                    img, models, self.engine, self.conf, self.iou
                 )
 
-                # Update visualiser placeholder (BGR → RGB)
-                with frame_placeholder.container():
-                    _, img_col, _ = st.columns([1, 3, 1])
-                    with img_col:
-                        st.image(
-                            cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB),
-                            caption="Live Feed",
-                            use_container_width=True,
-                        )
+                # Store metrics for display
+                self.result_info = {
+                    "engine": engine_label,
+                    "infer_ms": infer_ms,
+                    "count": count,
+                }
 
-                # Update scorecard
-                with score_placeholder.container():
-                    render_scorecard(engine_label, infer_ms, count)
+                return av.VideoFrame.from_ndarray(annotated, format="bgr24")
 
-        finally:
-            cap.release()
+        # TURN server config for cloud NAT traversal
+        rtc_config = {
+            "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+        }
+
+        ctx = webrtc_streamer(
+            key="smart-stunting-webcam",
+            video_processor_factory=YOLOVideoProcessor,
+            rtc_configuration=rtc_config,
+            media_stream_constraints={"video": True, "audio": False},
+        )
+
+        # Display metrics while streaming
+        if ctx.video_processor:
+            info = ctx.video_processor.result_info
+            render_scorecard(
+                info.get("engine", engine),
+                info.get("infer_ms", 0.0),
+                info.get("count", 0),
+            )
 
 
 # ---------------------------------------------------------------------------
