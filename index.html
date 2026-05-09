@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Stunting Care - Realtime Web</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- ONNX Runtime Web for Browser Inference -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Smart Stunting Care</h1>
+            <p>Real-time Client-Side Detection (Direct Camera Access)</p>
+        </header>
+
+        <main>
+            <div class="controls">
+                <button id="start-btn">Mulai Kamera</button>
+                <button id="stop-btn" disabled>Hentikan Kamera</button>
+                
+                <div class="settings">
+                    <label>Model:
+                        <select id="model-select">
+                            <option value="models/yolov8_best_fold_3.onnx">YOLOv8</option>
+                            <option value="models/yolov11_best_fold_3.onnx">YOLO11</option>
+                            <option value="models/yolov26_best_fold_3.onnx">YOLO26</option>
+                        </select>
+                    </label>
+                    <label>Confidence: <span id="conf-val">0.25</span>
+                        <input type="range" id="conf-slider" min="0" max="1" step="0.05" value="0.25">
+                    </label>
+                </div>
+            </div>
+
+            <div class="video-container">
+                <video id="webcam" autoplay playsinline muted></video>
+                <canvas id="overlay"></canvas>
+            </div>
+            
+            <div class="metrics">
+                <div class="metric-card">
+                    <div class="metric-value" id="fps-val">0</div>
+                    <div class="metric-label">FPS (Client-Side)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="count-val">0</div>
+                    <div class="metric-label">Objek Terdeteksi</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
