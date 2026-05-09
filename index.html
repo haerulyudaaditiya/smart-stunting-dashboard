@@ -26,10 +26,14 @@
                             <option value="models/yolov8_best_fold_3.onnx">YOLOv8</option>
                             <option value="models/yolov11_best_fold_3.onnx">YOLO11</option>
                             <option value="models/yolov26_best_fold_3.onnx">YOLO26</option>
+                            <option value="ensemble">Ensemble (Semua Model)</option>
                         </select>
                     </label>
                     <label>Confidence: <span id="conf-val">0.25</span>
                         <input type="range" id="conf-slider" min="0" max="1" step="0.05" value="0.25">
+                    </label>
+                    <label>IoU (NMS): <span id="iou-val">0.45</span>
+                        <input type="range" id="iou-slider" min="0" max="1" step="0.05" value="0.45">
                     </label>
                 </div>
             </div>

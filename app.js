@@ -6,10 +6,13 @@ const stopBtn = document.getElementById('stop-btn');
 const modelSelect = document.getElementById('model-select');
 const confSlider = document.getElementById('conf-slider');
 const confVal = document.getElementById('conf-val');
+const iouSlider = document.getElementById('iou-slider');
+const iouVal = document.getElementById('iou-val');
 const fpsVal = document.getElementById('fps-val');
 const countVal = document.getElementById('count-val');
 
-let session;
+let sessions = {}; // Store loaded models
+let currentMode = "models/yolov8_best_fold_3.onnx";
 let isDetecting = false;
 let animationId;
 let lastTime = 0;
@@ -20,17 +23,25 @@ const colors = ["#FF4B4B", "#21C354"];
 // Configure ONNX Runtime to use WASM backend (Pinned version)
 ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/";
 
-async function initModel(modelPath) {
-    if (session) {
-        await session.release();
-    }
+async function initModel(mode) {
+    currentMode = mode;
     startBtn.disabled = true;
     startBtn.innerText = "Memuat Model... (Mohon Tunggu)";
     try {
-        console.log(`Loading model: ${modelPath}`);
-        // Load the ONNX model using WebAssembly backend
-        session = await ort.InferenceSession.create(modelPath, { executionProviders: ['wasm'] });
-        console.log(`Model loaded successfully!`);
+        const pathsToLoad = mode === "ensemble" ? [
+            "models/yolov8_best_fold_3.onnx",
+            "models/yolov11_best_fold_3.onnx",
+            "models/yolov26_best_fold_3.onnx"
+        ] : [mode];
+
+        for (const path of pathsToLoad) {
+            if (!sessions[path]) {
+                console.log(`Loading model: ${path}`);
+                sessions[path] = await ort.InferenceSession.create(path, { executionProviders: ['wasm'] });
+                console.log(`Loaded: ${path}`);
+            }
+        }
+        
         if (!isDetecting) {
             startBtn.disabled = false;
             startBtn.innerText = "Mulai Kamera";
@@ -42,9 +53,8 @@ async function initModel(modelPath) {
     }
 }
 
-confSlider.addEventListener('input', (e) => {
-    confVal.innerText = e.target.value;
-});
+confSlider.addEventListener('input', (e) => confVal.innerText = e.target.value);
+iouSlider.addEventListener('input', (e) => iouVal.innerText = e.target.value);
 
 modelSelect.addEventListener('change', async (e) => {
     await initModel(e.target.value);
@@ -86,7 +96,15 @@ stopBtn.addEventListener('click', () => {
 async function detectFrame(currentTime) {
     if (!isDetecting) return;
 
-    if (!session) {
+    // Check if the required sessions are loaded
+    let isReady = true;
+    if (currentMode === "ensemble") {
+        if (!sessions["models/yolov8_best_fold_3.onnx"] || !sessions["models/yolov11_best_fold_3.onnx"] || !sessions["models/yolov26_best_fold_3.onnx"]) isReady = false;
+    } else {
+        if (!sessions[currentMode]) isReady = false;
+    }
+
+    if (!isReady) {
         animationId = requestAnimationFrame(detectFrame);
         return;
     }
@@ -98,21 +116,16 @@ async function detectFrame(currentTime) {
     }
     lastTime = currentTime;
 
-    // 1. Preprocess: Resize and format to Float32Array [1, 3, 640, 640]
     const inputSize = 640;
-    // Create an offscreen canvas for resizing
     const offscreenCanvas = document.createElement('canvas');
     offscreenCanvas.width = inputSize;
     offscreenCanvas.height = inputSize;
     const offscreenCtx = offscreenCanvas.getContext('2d');
     
-    // Draw video frame to offscreen canvas (resize)
     offscreenCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, inputSize, inputSize);
     const imgData = offscreenCtx.getImageData(0, 0, inputSize, inputSize).data;
     
     const float32Data = new Float32Array(3 * inputSize * inputSize);
-    
-    // HWC to CHW and normalize 0-1
     for (let i = 0; i < inputSize * inputSize; i++) {
         float32Data[i] = imgData[i * 4] / 255.0; // R
         float32Data[inputSize * inputSize + i] = imgData[i * 4 + 1] / 255.0; // G
@@ -122,69 +135,48 @@ async function detectFrame(currentTime) {
     const inputTensor = new ort.Tensor('float32', float32Data, [1, 3, inputSize, inputSize]);
     
     try {
-        const feeds = {};
-        feeds[session.inputNames[0]] = inputTensor;
-        
-        // 2. Inference
-        const results = await session.run(feeds);
-        const output = results[session.outputNames[0]].data;
-        const dims = results[session.outputNames[0]].dims; 
-        
-        let boxes = [];
         const confThresh = parseFloat(confSlider.value);
-        
-        // YOLOv8 & YOLO11 Output: [1, 6, 8400]
-        if (dims.length === 3 && dims[1] === 6 && dims[2] === 8400) {
-            for (let i = 0; i < 8400; i++) {
-                const score0 = output[4 * 8400 + i]; // class 0
-                const score1 = output[5 * 8400 + i]; // class 1
-                
-                const maxScore = Math.max(score0, score1);
-                const classId = score0 > score1 ? 0 : 1;
-                
-                if (maxScore >= confThresh) {
-                    const cx = output[0 * 8400 + i];
-                    const cy = output[1 * 8400 + i];
-                    const w = output[2 * 8400 + i];
-                    const h = output[3 * 8400 + i];
-                    
-                    const x1 = cx - w / 2;
-                    const y1 = cy - h / 2;
-                    const x2 = cx + w / 2;
-                    const y2 = cy + h / 2;
-                    
-                    boxes.push({ x1, y1, x2, y2, score: maxScore, classId });
-                }
-            }
-            boxes = nms(boxes, 0.45);
-        } 
-        // YOLO26 Output (End-to-end NMS): [1, 300, 6]
-        else if (dims.length === 3 && dims[1] === 300 && dims[2] === 6) {
-            for (let i = 0; i < 300; i++) {
-                const score = output[i * 6 + 4];
-                if (score >= confThresh) {
-                    const x1 = output[i * 6 + 0];
-                    const y1 = output[i * 6 + 1];
-                    const x2 = output[i * 6 + 2];
-                    const y2 = output[i * 6 + 3];
-                    const classId = Math.round(output[i * 6 + 5]);
-                    boxes.push({ x1, y1, x2, y2, score, classId });
-                }
-            }
-            // YOLO26 already applies NMS internally, but we can do a pass to be safe if needed.
-            // We'll skip NMS here since it's already filtered.
+        const iouThresh = parseFloat(iouSlider.value);
+        let allBoxes = [];
+
+        if (currentMode === "ensemble") {
+            const paths = [
+                "models/yolov8_best_fold_3.onnx",
+                "models/yolov11_best_fold_3.onnx",
+                "models/yolov26_best_fold_3.onnx"
+            ];
+            const promises = paths.map(path => {
+                const sess = sessions[path];
+                const feeds = {};
+                feeds[sess.inputNames[0]] = inputTensor;
+                return sess.run(feeds).then(results => {
+                    const output = results[sess.outputNames[0]].data;
+                    const dims = results[sess.outputNames[0]].dims;
+                    return extractBoxes(output, dims, confThresh);
+                });
+            });
+            const boxArrays = await Promise.all(promises);
+            for (const arr of boxArrays) allBoxes.push(...arr);
+        } else {
+            const sess = sessions[currentMode];
+            const feeds = {};
+            feeds[sess.inputNames[0]] = inputTensor;
+            const results = await sess.run(feeds);
+            const output = results[sess.outputNames[0]].data;
+            const dims = results[sess.outputNames[0]].dims;
+            allBoxes = extractBoxes(output, dims, confThresh);
         }
+
+        // 3. Apply NMS and Draw
+        const finalBoxes = nms(allBoxes, iouThresh);
         
-        // 3. Draw
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Scale factors from 640x640 to original video size
         const scaleX = video.videoWidth / inputSize;
         const scaleY = video.videoHeight / inputSize;
         
-        countVal.innerText = boxes.length;
+        countVal.innerText = finalBoxes.length;
 
-        boxes.forEach(box => {
+        finalBoxes.forEach(box => {
             const x1 = box.x1 * scaleX;
             const y1 = box.y1 * scaleY;
             const w = (box.x2 - box.x1) * scaleX;
@@ -212,6 +204,41 @@ async function detectFrame(currentTime) {
     }
 
     animationId = requestAnimationFrame(detectFrame);
+}
+
+// Helper to extract boxes depending on model output shape
+function extractBoxes(output, dims, confThresh) {
+    let boxes = [];
+    if (dims.length === 3 && dims[1] === 6 && dims[2] === 8400) {
+        for (let i = 0; i < 8400; i++) {
+            const score0 = output[4 * 8400 + i];
+            const score1 = output[5 * 8400 + i];
+            const maxScore = Math.max(score0, score1);
+            if (maxScore >= confThresh) {
+                const classId = score0 > score1 ? 0 : 1;
+                const cx = output[0 * 8400 + i];
+                const cy = output[1 * 8400 + i];
+                const w = output[2 * 8400 + i];
+                const h = output[3 * 8400 + i];
+                boxes.push({ x1: cx - w/2, y1: cy - h/2, x2: cx + w/2, y2: cy + h/2, score: maxScore, classId });
+            }
+        }
+    } else if (dims.length === 3 && dims[1] === 300 && dims[2] === 6) {
+        for (let i = 0; i < 300; i++) {
+            const score = output[i * 6 + 4];
+            if (score >= confThresh) {
+                const classId = Math.round(output[i * 6 + 5]);
+                boxes.push({
+                    x1: output[i * 6 + 0],
+                    y1: output[i * 6 + 1],
+                    x2: output[i * 6 + 2],
+                    y2: output[i * 6 + 3],
+                    score, classId
+                });
+            }
+        }
+    }
+    return boxes;
 }
 
 // Basic Non-Max Suppression algorithm
