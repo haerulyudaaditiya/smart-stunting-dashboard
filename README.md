@@ -2,6 +2,8 @@
 
 Real-time nutritional status detection dashboard that classifies children as **gizi_buruk** (malnourished) or **normal** using YOLO object detection models.
 
+**Live Demo:** [https://smart-stunting-dashboard.streamlit.app](https://smart-stunting-dashboard.streamlit.app)
+
 ## Features
 
 - **Multi-Engine Detection** — Switch between YOLOv8, YOLO11, YOLO26, or Ensemble (NMS Voting) mode
