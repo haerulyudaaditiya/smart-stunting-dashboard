@@ -29,6 +29,25 @@ header h1 {
     margin: 0 0 10px 0;
 }
 
+.dashboard-link {
+    display: inline-block;
+    margin-top: 10px;
+    background-color: var(--card-bg);
+    color: #4CAF50;
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: bold;
+    border: 1px solid #4CAF50;
+    transition: all 0.3s ease;
+}
+
+.dashboard-link:hover {
+    background-color: #4CAF50;
+    color: var(--bg);
+}
+
 .controls {
     background: var(--card-bg);
     padding: 15px;

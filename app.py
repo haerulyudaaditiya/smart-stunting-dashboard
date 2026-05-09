@@ -540,7 +540,17 @@ def main():
             )
             return
 
-        st.info("Allow camera access in your browser when prompted.")
+        st.markdown(
+            """
+            <div style="background-color: #d4edda; border-color: #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="margin-top: 0; color: #155724;">Performa Kamera Maksimal Tersedia!</h3>
+                <p>Untuk deteksi <em>real-time</em> tanpa lag (berjalan 100% di perangkat Anda tanpa delay server), silakan gunakan Modul Kamera Web Khusus kami:</p>
+                <a href="https://haerulyudaaditiya.github.io/smart-stunting-dashboard/" target="_blank" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">👉 Buka Kamera Real-time (Cepat)</a>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        st.info("Atau, Anda dapat menggunakan versi Cloud (WebRTC) di bawah ini dengan kecepatan frame yang lebih rendah.")
 
         # Build a video processor class that captures the current settings
         class YOLOVideoProcessor(VideoProcessorBase):
